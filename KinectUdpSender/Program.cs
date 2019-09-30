@@ -12,8 +12,8 @@ namespace KinectUdpSender
 {
     class Program
     {
-        static int hostPort = 20000;
-        static string hostIp = "192.168.43.139";
+        static int defaultPort = 20000;
+        static string defaultIp = "localhost";
 
         static UdpClient sender;
 
@@ -39,8 +39,22 @@ namespace KinectUdpSender
         {
             var message = Encoding.ASCII.GetBytes(DateTime.Now.ToString() + " " + BuildMessage(KinectController.Joints));
 
-            var address = File.ReadAllLines("address.txt");
-            Program.sender.Send(message, message.Length, address[0], int.Parse(address[1]));
+            // address that the message will be sent
+            string hostIp;
+            int hostPort;
+
+            try
+            {
+                var address = File.ReadAllLines(@"..\..\..\address.txt");
+                hostIp = address[0];
+                hostPort = int.Parse(address[1]);
+            } catch
+            {
+                hostIp = defaultIp;
+                hostPort = defaultPort;                
+            }
+
+            Program.sender.Send(message, message.Length, hostIp, hostPort);
 
             Console.WriteLine(string.Format("at [{0}] sent a frame with spineBase.X = {1}", DateTime.Now.ToString(), KinectController.Joints[JointType.SpineBase].Position.X));
         }
