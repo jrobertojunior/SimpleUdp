@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using Microsoft.Kinect;
 
 namespace KinectUdpSender
@@ -11,6 +12,8 @@ namespace KinectUdpSender
     {
         private static KinectSensor kinectSensor;
         private static BodyFrameReader bodyFrameReader;
+        private static CoordinateMapper coordinateMapper = null;
+
         private static Body[] bodies = null;
 
         public static event EventHandler OnNewFrame;
@@ -19,12 +22,15 @@ namespace KinectUdpSender
 
 
         public static Dictionary<JointType, Joint> Joints;
+        public static Dictionary<JointType, Point> JointPoints;
 
 
         public static void Init()
         {
             kinectSensor = KinectSensor.GetDefault();
             bodyFrameReader = kinectSensor.BodyFrameSource.OpenReader();
+            coordinateMapper = kinectSensor.CoordinateMapper;
+
             kinectSensor.Open();
 
             bodyFrameReader.FrameArrived += Update;
@@ -53,7 +59,6 @@ namespace KinectUdpSender
                     {
                         if (body.IsTracked)
                         {
-
                             KinectController.Joints = new Dictionary<JointType, Joint>();
 
                             foreach (JointType jointType in body.Joints.Keys)
@@ -61,13 +66,22 @@ namespace KinectUdpSender
                                 Joints.Add(jointType, body.Joints[jointType]);
                             }
 
-                            Microsoft.Kinect.Joint head = Joints[Microsoft.Kinect.JointType.Head];
+                            KinectController.JointPoints = new Dictionary<JointType, Point>();
 
-                            if (head != null)
+                            foreach (JointType jointType in KinectController.Joints.Keys)
                             {
-                                //Console.WriteLine(head.Position.X);
-                            }
+                                // sometimes the depth(Z) of an inferred joint may show as negative
+                                // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
+                                CameraSpacePoint position = KinectController.Joints[jointType].Position;
+                                if (position.Z < 0)
+                                {
+                                    position.Z = 0.1f;
+                                }
 
+                                DepthSpacePoint depthSpacePoint = coordinateMapper.MapCameraPointToDepthSpace(position);
+                                JointPoints.Add(jointType, new Point(depthSpacePoint.X, depthSpacePoint.Y));
+                            }
+                                                       
                             // raise new frame event
                             OnNewFrame?.Invoke(null, EventArgs.Empty);
                         }
